@@ -1,0 +1,37 @@
+-- SQLite Query for Sprout Social Part 1
+
+/*
+Uncomment this code block to drop records from respective tables.
+The customer_table is the primary key for customer_id fields and has 783 distinct customer_ids
+The customer_logins table has 787 distinct customers and uses customer_table as a foreign key
+
+Recommendation to drop records from table where customer_id not present in customer table.
+The below code will remove the respective records from the customer_logins & login_history tables
+
+DELETE FROM customer_logins
+WHERE customer_id NOT IN (SELECT customer_id FROM customer);
+
+DELETE FROM login_history
+WHERE login_id NOT IN (SELECT login_id FROM customer_logins);
+*/
+
+WITH 
+	cte_unique_login_ids_from_login_history AS (
+		SELECT distinct login_id FROM login_history
+		)
+SELECT 
+	(COUNT(distinct cl.login_id) - COUNT(distinct lh.login_id)) AS cnt_users_never_logged_in,
+    PRINTF(  '%1.2f%%', --Formatting used by "PRINTF" to include '%' character on result in SQLite
+		CAST(COUNT(distinct cl.login_id) - COUNT(distinct lh.login_id) AS FLOAT) /  COUNT(distinct cl.login_id)*100
+		) AS pct_users_never_logged_in,
+	(SELECT count(DISTINCT customer_id)
+		FROM customer_logins
+		WHERE login_id NOT IN cte_unique_login_ids_from_login_history
+		) AS cnt_customers_w_users_never_logged_in,
+	(SELECT PRINTF(  '%1.2f%%', CAST(count(DISTINCT customer_id) AS FLOAT)  / (SELECT COUNT(distinct customer_id) FROM customer_logins) *100) 
+		FROM customer_logins 
+		WHERE login_id NOT IN cte_unique_login_ids_from_login_history
+		) AS pct_customers_w_users_never_logged_in
+FROM customer_logins cl
+LEFT JOIN login_history lh
+ON cl.login_id = lh.login_id
